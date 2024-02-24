@@ -1,4 +1,4 @@
-module ip-enricher
+module github.com/gigaryte/ip-enricher
 
 go 1.20
 

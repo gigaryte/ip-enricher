@@ -1,6 +1,6 @@
 module ip-enricher
 
-go 1.21.6
+go 1.20
 
 require (
 	github.com/jackyyf/go-mrt v0.0.0-20210305201300-d29e1d7d1a7c

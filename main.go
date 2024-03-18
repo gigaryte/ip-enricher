@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
 	"github.com/seancfoley/ipaddress-go/ipaddr"
 	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
@@ -259,7 +261,7 @@ func readFile(file string) {
 		} else {
 			/* Or plain text? */
 			if outFile != nil {
-				outFile.WriteString(fmt.Sprintf("%v\t%v\t%v\t%v\t%v\n", ip, prefix_string, ASN, record.CC, record.RIR, record.Name))
+				outFile.WriteString(fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\n", ip, prefix_string, ASN, record.CC, record.RIR, record.Name))
 			} else {
 				fmt.Println()
 				fmt.Println(ip, prefix_string, ASN, record.CC, record.RIR, record.Name)
@@ -268,9 +270,35 @@ func readFile(file string) {
 	}
 }
 
+func readIface(iface string) {
+
+	// Open the network device for packet capture
+	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer handle.Close()
+
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+
+	// Loop over captured packets
+	for packet := range packetSource.Packets() {
+
+		networkLayer := packet.NetworkLayer()
+		if networkLayer == nil {
+			continue
+		}
+
+		srcIP, dstIP := networkLayer.NetworkFlow().Endpoints()
+
+		fmt.Println(srcIP, dstIP)
+	}
+
+}
+
 func init() {
 
-	// Define flags
+	// Commandline flags
 	flag.StringVarP(&output, "output", "o", "", "Output filename")
 	flag.BoolVarP(&asnLookup, "asn", "a", false, "Lookup ASNs for IP addresses")
 	flag.BoolVarP(&jsonOutput, "json", "j", false, "Output in JSON format")
@@ -312,7 +340,7 @@ func main() {
 		readFile(file)
 	} else if iface != "" {
 		// read from the interface
-		log.Fatal("Reading from interfaces not yet implemented")
+		readIface(iface)
 	} else if nfqueue != 0 {
 		// read from the nfqueue
 		log.Fatal("Reading from nfqueue not yet implemented")

@@ -141,7 +141,7 @@ ribv6.20240318.0000.bz2 -j -o example-output.json
 {"ip":"115.78.226.125","prefix":"115.78.224.0/21","asn":7552}
 ```
 
-## ASN lookup
+### Optional: Team Cymru AS name lookup
 
 To enrich the IP addresses with additional AS information, we can use Team
 Cymru's DNS-based ASN lookup service. This requires an Internet connection and

@@ -66,7 +66,6 @@ especially if your IPs are only IPv4 or only IPv6.
 `--help` flags.  
 
 ```bash
-ip-enricher -h
 > ./ip-enricher -h
   -a, --asn               Lookup ASNs for IP addresses
   -f, --file string       IP file to read

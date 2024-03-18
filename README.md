@@ -68,13 +68,13 @@ especially if your IPs are only IPv4 or only IPv6.
 ```bash
 ip-enricher -h
 > ./ip-enricher -h
-Usage of ./ip-enricher:
   -a, --asn               Lookup ASNs for IP addresses
   -f, --file string       IP file to read
   -j, --json              Output in JSON format
   -o, --output string     Output filename
   -i, --ribFile strings   RIB files to read
   -v, --verbose           Verbose output
+  -V, --version           Print version and exit
 pflag: help requested
 ```
 

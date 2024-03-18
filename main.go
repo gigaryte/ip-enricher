@@ -18,6 +18,10 @@ import (
 	mrt "github.com/jackyyf/go-mrt"
 )
 
+const (
+	versionString = "0.1.0"
+)
+
 var (
 	// Output filename
 	output string
@@ -27,6 +31,8 @@ var (
 	asnLookup bool
 	// Enable verbose output
 	verbose bool
+	// Print version and exit
+	version bool
 	// Write JSON
 	jsonOutput bool
 	// RIB files to read
@@ -285,7 +291,13 @@ func init() {
 	flag.StringVarP(&file, "file", "f", "", "IP file to read")
 	flag.StringSliceVarP(&ribFiles, "ribFile", "i", []string{}, "RIB files to read")
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	flag.BoolVarP(&version, "version", "V", false, "Print version and exit")
 	flag.Parse()
+
+	if version {
+		fmt.Printf("ip-enricher version %v\n", versionString)
+		os.Exit(0)
+	}
 
 	// Check loglevel
 	if verbose {

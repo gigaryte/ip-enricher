@@ -11,8 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
 	"github.com/seancfoley/ipaddress-go/ipaddr"
 	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
@@ -35,10 +33,6 @@ var (
 	ribFiles []string
 	// IP address file
 	file string
-	// Interface to read from
-	iface string
-	// nfqueue number to read from
-	nfqueue uint16
 	// Tries for v4 and v6
 	v4Trie = ipaddr.Trie[*ipaddr.IPAddress]{}
 	v6Trie = ipaddr.Trie[*ipaddr.IPAddress]{}
@@ -54,12 +48,15 @@ var (
 	wg sync.WaitGroup
 )
 
+// ASNData is a struct to hold ASN data (CC, RIR, and AS name)
 type ASNData struct {
-	CC   string `json:"cc"`
-	RIR  string `json:"rir"`
-	Name string `json:"name"`
+	CC   string `json:"cc,omitempty"`
+	RIR  string `json:"rir,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
+// Record keeps track of the IP address, prefix, and ASN, along with
+// ASN Data from Team Cymru
 type Record struct {
 	IP     string `json:"ip"`
 	Prefix string `json:"prefix"`
@@ -67,6 +64,9 @@ type Record struct {
 	ASNData
 }
 
+// queryASN data makes a DNS query to Team Cymru to get ASN data like ASN name,
+// RIR, and country code
+// This only happens if you use the -a flag
 func queryASNData(asn int) ASNData {
 
 	// If we already have the data, return it without doing the DNS query
@@ -105,7 +105,7 @@ func queryASNData(asn int) ASNData {
 // Read the RIB from a file, populating the v4 and v6 tries & maps
 func readRIB(file string) {
 
-	log.Infof("Reading RIB from file: %s", file)
+	log.Infof("Reading RIB from file %s", file)
 
 	fp, err := os.Open(file)
 	if err != nil {
@@ -115,12 +115,12 @@ func readRIB(file string) {
 	fz := bzip2.NewReader(fp)
 	mr := mrt.NewReader(fz)
 
-	defer func() {
-		log.Printf("done processing")
+	defer func(fname string) {
+		log.Println("Done processing", fname)
 		if x := recover(); x != nil {
 			log.Printf("run time panic: %v, processing ended early", x)
 		}
-	}()
+	}(file)
 
 	ctr := 0
 	for {
@@ -200,6 +200,8 @@ func readRIB(file string) {
 
 }
 
+// readFile reads a file of IPs and looks up the prefix and ASN for each IP
+// outputs results to stdout or a file according to runtime flags
 func readFile(file string) {
 
 	f, err := os.Open(file)
@@ -221,6 +223,7 @@ func readFile(file string) {
 
 		prefix_string := "N/A"
 		ASN := -1
+
 		// Look up the IP address in the v4 and v6 tries
 		if addr.IsIPv4() {
 			prefix := v4Trie.LongestPrefixMatch(addr)
@@ -273,53 +276,28 @@ func readFile(file string) {
 	}
 }
 
-func readIface(iface string) {
-
-	// Open the network device for packet capture
-	handle, err := pcap.OpenLive(iface, 1600, true, pcap.BlockForever)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer handle.Close()
-
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-
-	// Loop over captured packets
-	for packet := range packetSource.Packets() {
-
-		networkLayer := packet.NetworkLayer()
-		if networkLayer == nil {
-			continue
-		}
-
-		srcIP, dstIP := networkLayer.NetworkFlow().Endpoints()
-
-		fmt.Println(srcIP, dstIP)
-	}
-
-}
-
 func init() {
 
 	// Commandline flags
 	flag.StringVarP(&output, "output", "o", "", "Output filename")
 	flag.BoolVarP(&asnLookup, "asn", "a", false, "Lookup ASNs for IP addresses")
 	flag.BoolVarP(&jsonOutput, "json", "j", false, "Output in JSON format")
-	flag.StringVarP(&iface, "interface", "I", "", "Interface to read packets from")
-	flag.Uint16VarP(&nfqueue, "nfqueue", "n", 0, "nfqueue number to read from")
 	flag.StringVarP(&file, "file", "f", "", "IP file to read")
 	flag.StringSliceVarP(&ribFiles, "ribFile", "i", []string{}, "RIB files to read")
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	flag.Parse()
 
+	// Check loglevel
 	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if iface == "" && file == "" {
-		log.Fatal("You must specify an interface or file from which to read")
+	// Check for required flags
+	if file == "" {
+		log.Fatal("You must specify a file from which to read")
 	}
 
+	// Touch the output file
 	if output != "" {
 		var err error
 		outFile, err = os.Create(output)
@@ -332,6 +310,7 @@ func init() {
 
 func main() {
 
+	// Read the RIB files in parallel
 	log.Debugf("Reading %v files\n", len(ribFiles))
 	for _, file := range ribFiles {
 		wg.Add(1)
@@ -343,16 +322,13 @@ func main() {
 
 	// Wait for all the RIB files to be read
 	wg.Wait()
+	log.Infoln("All RIB files read; processing IP file")
 
 	if file != "" {
 		// read the IP file
 		readFile(file)
-	} else if iface != "" {
-		// read from the interface
-		readIface(iface)
-	} else if nfqueue != 0 {
-		// read from the nfqueue
-		log.Fatal("Reading from nfqueue not yet implemented")
 	}
+
+	log.Infoln("Completed")
 
 }

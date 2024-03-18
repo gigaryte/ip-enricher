@@ -1,6 +1,6 @@
-module ip-enricher
+module github.com/gigaryte/ip-enricher
 
-go 1.21.6
+go 1.20
 
 require (
 	github.com/google/gopacket v1.1.19

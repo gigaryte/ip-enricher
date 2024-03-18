@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -49,6 +50,8 @@ var (
 	v6Default = ipaddr.NewIPAddressString("::/0").GetAddress()
 	// Keep track of ASN data so no need to requery the same data
 	asnData = make(map[int]ASNData)
+	// WaitGroup for reading RIB files
+	wg sync.WaitGroup
 )
 
 type ASNData struct {
@@ -263,8 +266,8 @@ func readFile(file string) {
 			if outFile != nil {
 				outFile.WriteString(fmt.Sprintf("%v\t%v\t%v\t%v\t%v\t%v\n", ip, prefix_string, ASN, record.CC, record.RIR, record.Name))
 			} else {
-				fmt.Println()
-				fmt.Println(ip, prefix_string, ASN, record.CC, record.RIR, record.Name)
+				fmt.Printf("%v\t%v\t%v\t%v\t%v\t%v\n", ip,
+					prefix_string, ASN, record.CC, record.RIR, record.Name)
 			}
 		}
 	}
@@ -329,11 +332,17 @@ func init() {
 
 func main() {
 
-	fmt.Println(ribFiles)
-
+	log.Debugf("Reading %v files\n", len(ribFiles))
 	for _, file := range ribFiles {
-		readRIB(file)
+		wg.Add(1)
+		go func(file string) {
+			defer wg.Done()
+			readRIB(file)
+		}(file)
 	}
+
+	// Wait for all the RIB files to be read
+	wg.Wait()
 
 	if file != "" {
 		// read the IP file
